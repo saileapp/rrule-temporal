@@ -1,4 +1,4 @@
-import {Temporal} from '@js-temporal/polyfill';
+import {Temporal} from 'temporal-polyfill';
 import {RRuleTemporal, allowedWeekdays, type Weekday} from './index';
 
 interface UnitStrings {
