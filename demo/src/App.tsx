@@ -379,6 +379,20 @@ export default function App() {
         </button>
       </div>
 
+      <div className="mb-4 rounded border border-gray-200 bg-white/70 px-3 py-2 text-xs sm:text-sm text-gray-800 dark:border-gray-600 dark:bg-slate-800/80 dark:text-gray-100">
+        Sponsored by{' '}
+        <a
+          href="https://postalform.com/?utm_source=github&utm_medium=demo&utm_campaign=rrule-temporal"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-700 hover:underline"
+        >
+          PostalForm 💌
+        </a>{' '}
+        — upload a PDF and we print + mail it via USPS (no printer or stamps needed). The easiest mailing
+        platform for both AI Agents via MCP and humans!
+      </div>
+
       {/* mode switch */}
       <div className="mb-4 flex flex-wrap gap-2">
         {(['visual', 'raw'] as const).map((m) => (
@@ -663,46 +677,6 @@ export default function App() {
                 <label className="font-medium sm:w-20">Include DT:</label>
                 <input type="checkbox" checked={includeDtstart} onChange={(e) => setIncludeDtstart(e.target.checked)} />
               </div>
-
-              {/* RDATE */}
-              <div className="flex items-center space-x-2">
-                <label className="font-medium w-20">RDATE:</label>
-                <input
-                  type="text"
-                  className="border rounded p-1 flex-1"
-                  value={rDateStr}
-                  onChange={(e) => setRDateStr(e.target.value)}
-                />
-              </div>
-
-              {/* EXDATE */}
-              <div className="flex items-center space-x-2">
-                <label className="font-medium w-20">EXDATE:</label>
-                <input
-                  type="text"
-                  className="border rounded p-1 flex-1"
-                  value={exDateStr}
-                  onChange={(e) => setExDateStr(e.target.value)}
-                />
-              </div>
-
-              {/* MAX ITER */}
-              <div className="flex items-center space-x-2">
-                <label className="font-medium w-20">Max Iter:</label>
-                <input
-                  type="number"
-                  min={1}
-                  className="border rounded p-1 w-24"
-                  value={maxIterations}
-                  onChange={(e) => setMaxIterations(parseInt(e.target.value) || 1)}
-                />
-              </div>
-
-              {/* INCLUDE DTSTART */}
-              <div className="flex items-center space-x-2">
-                <label className="font-medium w-20">Include DT:</label>
-                <input type="checkbox" checked={includeDtstart} onChange={(e) => setIncludeDtstart(e.target.checked)} />
-              </div>
             </div>
           )}
 
@@ -760,8 +734,29 @@ export default function App() {
         </div>
       </div>
 
-      <footer className="mt-8 text-xs text-gray-500">
-        Built with <code>rrule-temporal</code>, Temporal API & Tailwind v4.
+      <footer className="mt-8 pt-4 border-t text-center text-xs text-gray-500">
+        <div className="mb-2">
+          <a
+            href="https://github.com/ggaabe/rrule-temporal"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:underline text-blue-700"
+          >
+            GitHub
+          </a>
+          {' · '}
+          <a
+            href="https://www.npmjs.com/package/rrule-temporal"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:underline text-blue-700"
+          >
+            npm
+          </a>
+        </div>
+        <div>
+          Built with <code>rrule-temporal</code>, Temporal API & Tailwind v4.
+        </div>
       </footer>
     </div>
   );

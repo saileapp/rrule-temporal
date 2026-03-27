@@ -1,5 +1,7 @@
 # RRule Temporal
 
+> This library is sponsored by [PostalForm 💌](https://postalform.com/?utm_source=github&utm_medium=readme&utm_campaign=rrule-temporal) — upload a PDF and we print + mail it via USPS (no printer or stamps needed). The only mailing platform for AI Agents via MCP, and the easiest one for humans!
+
 The first and only fully compliant Recurrence rule ([RFC-5545](https://www.rfc-editor.org/rfc/rfc5545.html)) processing JS/TS library built on the Temporal API, now with support for [RFC-7529](https://www.rfc-editor.org/rfc/rfc7529.html) (RSCALE / SKIP) for non-Gregorian calendars.
 The library accepts the familiar `RRULE` format and returns
 `Temporal.ZonedDateTime` instances for easy time‑zone aware scheduling.
@@ -55,6 +57,14 @@ This is useful when:
 - Storing recurrence patterns separately from start dates in databases
 - Building rules programmatically from user input
 
+Note on `UNTIL` (RFC 5545): if `DTSTART` is a DATE-TIME with a `TZID` or UTC (`Z`),
+`UNTIL` must be a DATE-TIME in UTC (trailing `Z`). If `DTSTART` is `VALUE=DATE`,
+`UNTIL` must be a DATE (no time). Floating DATE-TIME rules (no `TZID`, no `Z`)
+allow a floating `UNTIL`.
+In default mode (`strict: false`), `UNTIL=YYYYMMDD` with a DATE-TIME `DTSTART`
+is accepted for compatibility and treated as inclusive end-of-day in `DTSTART`'s
+zone (converted to UTC when required). Set `strict: true` to reject it.
+
 ## Creating a rule with options
 
 Instead of a full ICS string you can supply the recurrence parameters directly:
@@ -105,7 +115,22 @@ below. These correspond to the recurrence rule parts defined in RFC&nbsp;5545:
 | `tzid` | Time zone identifier for interpreting dates. |
 | `maxIterations` | Safety cap when generating occurrences. |
 | `includeDtstart` | Include `DTSTART` even if it does not match the pattern. |
+| `strict` | Enforce RFC 5545 constraints strictly (defaults to false). |
 | `dtstart` | First occurrence as `Temporal.ZonedDateTime`. |
+
+### Reusable Option Lists
+
+The library also exports runtime option lists you can use to populate UI controls:
+
+```typescript
+import { allowedFreq, allowedWeekdays } from "rrule-temporal";
+
+// ["YEARLY", "MONTHLY", ...]
+console.log(allowedFreq);
+
+// ["MO", "TU", ...]
+console.log(allowedWeekdays);
+```
 
 ## Querying occurrences
 
@@ -125,6 +150,7 @@ const prev = rule.previous(new Date("2025-05-01T00:00Z"));
 ## Converting to human-readable text
 
 The `toText` helper converts a rule into a human readable description.
+`UNTIL` (and optional `DTSTART`) dates are locale-aware via `toLocaleString`.
 
 ```typescript
 import { Temporal } from "temporal-polyfill";
@@ -139,6 +165,7 @@ rule.toString();
 // "DTSTART;TZID=UTC:20250101T090000\nRRULE:FREQ=DAILY;COUNT=3"
 toText(rule);             // uses the runtime locale, defaults to English
 toText(rule, "es");      // Spanish description
+toText(rule, "en", { includeDtstart: true }); // include "starting from <DTSTART date>"
 toText(rule);
 // "every day for 3 times"
 
@@ -267,11 +294,37 @@ Notes
 | `new RRuleTemporal(opts)` | Create a rule from an ICS snippet or manual options. |
 | `all(iterator?)` | Return every occurrence. When the rule has no end the optional iterator is required. |
 | `between(after, before, inclusive?)` | Occurrences within a time range. |
+| `matches(date)` | Convenience helper: true if the exact instant is an occurrence (accepts `Date` or `Temporal.ZonedDateTime`). |
+| `occursOn(date)` | Convenience helper: true if any occurrence falls on the given `Temporal.PlainDate` in the rule's time zone (date-only, ignores time). |
 | `next(after?, inclusive?)` | Next occurrence after a given date. |
 | `previous(before?, inclusive?)` | Previous occurrence before a date. |
 | `toString()` | Convert the rule back into `DTSTART` and `RRULE` lines. |
-| `toText(rule, locale?)` | Human readable description (`en`, `es`, `hi`, `yue`, `ar`, `he`, `zh`, `fr`). |
+| `toText(rule, locale?, options?)` | Human readable description (`en`, `es`, `hi`, `yue`, `ar`, `he`, `zh`, `fr`). Options: `{ includeDtstart?: boolean }`. |
 | `options()` | Return the normalized options object. |
+
+## Benchmarks
+
+Uncached median ops/s from the benchmark suite on a MacBook Pro M2 Max.
+The full three-library comparison, including `rrule-rust`, lives in `benchmarks/README.md`.
+
+| Scenario | TZ | rrule-temporal median ops/s | rrule median ops/s | vs rrule |
+| --- | --- | ---: | ---: | ---: |
+| 30 daily occurrences | UTC | 29,275 | 16,762 | 1.75x |
+| 30 daily occurrences | America/Chicago | 2,067 | 364 | 5.68x |
+| Daily weekdays across many cycles | UTC | 1,894 | 766 | 2.47x |
+| Daily weekdays across many cycles | America/Chicago | 64.9 | 18.9 | 3.43x |
+| 720 hourly occurrences | UTC | 1,499 | 701 | 2.14x |
+| 720 hourly occurrences | America/Chicago | 104 | 14.1 | 7.38x |
+| 1,440 minutely occurrences | UTC | 751 | 325 | 2.31x |
+| 1,440 minutely occurrences | America/Chicago | 145 | 7.1 | 20.42x |
+| Weekly MO/WE/FR across many cycles | UTC | 1,179 | 1,053 | 1.12x |
+| Weekly MO/WE/FR across many cycles | America/Chicago | 64.4 | 14.6 | 4.41x |
+| Monthly last weekday across 20 years | UTC | 1,953 | 948 | 2.06x |
+| Monthly last weekday across 20 years | America/Chicago | 45.5 | 39.4 | 1.15x |
+| Monthly first and last weekday across 20 years | UTC | 1,378 | 1,202 | 1.15x |
+| Monthly first and last weekday across 20 years | America/Chicago | 40.0 | 24.2 | 1.65x |
+
+The current pattern is straightforward: `rrule-temporal` is faster than `rrule` across all of the scenarios above, with especially large gains on timezone-heavy daily, hourly, and minutely rules. The biggest recent jump came from the UTC monthly `BYDAY` + `BYSETPOS` path, which is now ahead as well.
 
 ## Further examples
 
@@ -374,3 +427,9 @@ const appOccurrences = rawOccurrences.map((zdt) =>
 ```
 
 Both approaches preserve the original calendar, time-zone and nanosecond accuracy.
+
+## Sponsor
+
+If this library saves you time, sponsorship helps keep it maintained.
+
+Primary sponsor: [PostalForm](https://postalform.com/?utm_source=github&utm_medium=readme&utm_campaign=rrule-temporal)

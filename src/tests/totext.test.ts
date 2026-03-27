@@ -22,6 +22,14 @@ describe('RRuleTemporal.toText', () => {
     expect(toText(rule)).toBe('every day');
   });
 
+  test('can include DTSTART in text output', () => {
+    const rule = new RRuleTemporal({
+      freq: 'DAILY',
+      dtstart: zdt(2025, 1, 1, 0),
+    });
+    expect(toText(rule, 'en', {includeDtstart: true})).toBe('every day starting from January 1, 2025');
+  });
+
   test('daily with hours', () => {
     const rule = new RRuleTemporal({
       freq: 'DAILY',
@@ -87,7 +95,7 @@ describe('RRuleTemporal.toText', () => {
       until,
       dtstart: zdt(2012, 1, 1, 0),
     });
-    expect(toText(rule)).toBe('every week until November 10, 2012');
+    expect(toText(rule)).toBe('every week on Sunday until November 10, 2012');
   });
 
   test('yearly byyearday', () => {
@@ -129,5 +137,37 @@ describe('RRuleTemporal.toText', () => {
       dtstart: zdt(2025, 1, 1, 0, 'UTC'),
     });
     expect(toText(rule)).toBe('every month for 1 time with 1 additional date excluding 2 dates');
+  });
+
+  test('weekly inherits dtstart minutes when BYMINUTE is omitted', () => {
+    const rule = new RRuleTemporal({
+      freq: 'WEEKLY',
+      byDay: ['SU'],
+      byHour: [12],
+      dtstart: Temporal.ZonedDateTime.from({
+        year: 2026,
+        month: 1,
+        day: 1,
+        hour: 10,
+        minute: 30,
+        timeZone: 'UTC',
+      }),
+    });
+    expect(toText(rule)).toBe('every week on Sunday at 12:30 PM UTC');
+  });
+
+  test('weekly inherits weekday and time from DTSTART when BYDAY is omitted', () => {
+    const rule = new RRuleTemporal({
+      freq: 'WEEKLY',
+      dtstart: Temporal.ZonedDateTime.from({
+        year: 2026,
+        month: 1,
+        day: 1,
+        hour: 10,
+        minute: 30,
+        timeZone: 'UTC',
+      }),
+    });
+    expect(toText(rule)).toBe('every week on Thursday at 10:30 AM UTC');
   });
 });

@@ -1,7 +1,12 @@
-import {RRuleTemporal} from '../index';
+import {RRuleTemporal, allowedFreq, allowedWeekdays} from '../index';
 import {assertDates, parse, zdt} from './helpers';
 
 describe('General RRule tests', () => {
+  it('exports allowed frequency and weekday option lists', () => {
+    expect(allowedFreq).toEqual(['YEARLY', 'MONTHLY', 'WEEKLY', 'DAILY', 'HOURLY', 'MINUTELY', 'SECONDLY']);
+    expect(allowedWeekdays).toEqual(['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU']);
+  });
+
   it('testMonthlyNegByMonthDayJanFebForNonLeapYear', () => {
     const rule = new RRuleTemporal({
       freq: 'MONTHLY',
@@ -82,6 +87,26 @@ describe('General RRule tests', () => {
     expect(rule.toString()).toContain('WKST=WE');
   });
 
+  it('normalizes lowercase FREQ and WKST from rruleString', () => {
+    const rruleString = 'DTSTART:20240101000000\nRRULE:FREQ=weekly;WKST=su;COUNT=1';
+    const rule = new RRuleTemporal({rruleString, dtstart: zdt(2024, 1, 1, 0, 'UTC')});
+    const options = rule.options();
+    expect(options.freq).toBe('WEEKLY');
+    expect(options.wkst).toBe('SU');
+  });
+
+  it('rejects invalid WKST values', () => {
+    expect(() => new RRuleTemporal({freq: 'WEEKLY', wkst: 'XX', count: 1, dtstart: zdt(2024, 1, 1, 0, 'UTC')})).toThrow(
+      'Invalid WKST value: XX',
+    );
+  });
+
+  it('rejects invalid FREQ values from rruleString', () => {
+    expect(() => new RRuleTemporal({rruleString: 'DTSTART:20240101T000000\nRRULE:FREQ=NOPE'})).toThrow(
+      'Invalid FREQ value: NOPE',
+    );
+  });
+
   it('missing Feb 28 issue', () => {
     const rule = new RRuleTemporal({
       freq: 'MONTHLY',
@@ -123,6 +148,32 @@ describe('General RRule tests', () => {
           dtstart: zdt(1997, 9, 2, 9, 'UTC'),
         }),
     ).toThrow('bySetPos may not contain 0');
+  });
+
+  it('strict rejects BYWEEKNO with non-YEARLY freq', () => {
+    expect(
+      () =>
+        new RRuleTemporal({
+          freq: 'MONTHLY',
+          count: 1,
+          byWeekNo: [15],
+          dtstart: zdt(1997, 9, 2, 9, 'UTC'),
+          strict: true,
+        }),
+    ).toThrow('BYWEEKNO MUST NOT be used unless FREQ=YEARLY');
+  });
+
+  it('strict rejects BYSETPOS without other BYxxx', () => {
+    expect(
+      () =>
+        new RRuleTemporal({
+          freq: 'MONTHLY',
+          count: 1,
+          bySetPos: [1],
+          dtstart: zdt(1997, 9, 2, 9, 'UTC'),
+          strict: true,
+        }),
+    ).toThrow('BYSETPOS MUST be used with another BYxxx rule part');
   });
 
   it('testInvalidNthWeekday', () => {

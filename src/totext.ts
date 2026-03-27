@@ -1,5 +1,5 @@
 import {Temporal} from 'temporal-polyfill';
-import {RRuleTemporal} from './index';
+import {RRuleTemporal, allowedWeekdays, type Weekday} from './index';
 
 interface UnitStrings {
   singular: string;
@@ -44,6 +44,7 @@ interface LocaleData {
     dates: string;
     and: string;
     last: string;
+    starting_from: string;
   };
   ordinal?: (n: number) => string;
 }
@@ -99,6 +100,7 @@ const en: LocaleData = {
     dates: 'dates',
     and: 'and',
     last: 'last',
+    starting_from: 'starting from',
   },
   ordinal: (n: number) => {
     const abs = Math.abs(n);
@@ -165,6 +167,7 @@ const de: LocaleData = {
     dates: 'Daten',
     and: 'und',
     last: 'letzter',
+    starting_from: 'beginnend am',
   },
   ordinal: (n: number) => {
     if (n < 0) return 'letzten';
@@ -223,6 +226,7 @@ const es: LocaleData = {
     dates: 'fechas',
     and: 'y',
     last: 'último',
+    starting_from: 'a partir de',
   },
   ordinal: (n: number) => (n < 0 ? 'último' : `${Math.abs(n)}º`),
 };
@@ -278,6 +282,7 @@ const hi: LocaleData = {
     dates: 'तारीखें',
     and: 'और',
     last: 'आखिरी',
+    starting_from: 'से शुरू',
   },
   ordinal: (n: number) => (n < 0 ? 'आखिरी' : `${Math.abs(n)}वां`),
 };
@@ -320,6 +325,7 @@ const yue: LocaleData = {
     dates: '日期',
     and: '和',
     last: '最後',
+    starting_from: '由',
   },
   ordinal: (n: number) => (n < 0 ? '最後' : `第${Math.abs(n)}`),
 };
@@ -375,6 +381,7 @@ const ar: LocaleData = {
     dates: 'تواريخ',
     and: 'و',
     last: 'الأخير',
+    starting_from: 'ابتداءً من',
   },
   ordinal: (n: number) => {
     if (n < 0) return 'الأخير';
@@ -449,6 +456,7 @@ const he: LocaleData = {
     dates: 'תאריכים',
     and: 'ו',
     last: 'אחרון',
+    starting_from: 'החל מ',
   },
   ordinal: (n: number) => {
     if (n < 0) return 'אחרון';
@@ -510,25 +518,26 @@ const zh: LocaleData = {
     dates: '日期',
     and: '和',
     last: '最后',
+    starting_from: '从',
   },
   ordinal: (n: number) => (n < 0 ? '最后' : `第${Math.abs(n)}`),
 };
 
 const fr: LocaleData = {
-  weekdayNames: ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'],
+  weekdayNames: ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'],
   monthNames: [
-    'Janvier',
-    'Février',
-    'Mars',
-    'Avril',
-    'Mai',
-    'Juin',
-    'Juillet',
-    'Août',
-    'Septembre',
-    'Octobre',
-    'Novembre',
-    'Décembre',
+    'janvier',
+    'février',
+    'mars',
+    'avril',
+    'mai',
+    'juin',
+    'juillet',
+    'août',
+    'septembre',
+    'octobre',
+    'novembre',
+    'décembre',
   ],
   units: {
     year: {singular: 'année', plural: 'ans'},
@@ -551,7 +560,7 @@ const fr: LocaleData = {
     at: 'à',
     at_minute: 'à la minute',
     at_second: 'à la seconde',
-    until: "jusqu'à",
+    until: "jusqu'au",
     for: 'pendant',
     time: 'fois',
     times: 'fois',
@@ -565,6 +574,7 @@ const fr: LocaleData = {
     dates: 'dates',
     and: 'et',
     last: 'dernier',
+    starting_from: 'à partir du',
   },
   ordinal: (n: number) => {
     const abs = Math.abs(n);
@@ -586,6 +596,11 @@ const LOCALES: Record<string, LocaleData> = {};
 for (const l of active) {
   if (ALL_LOCALES[l]) LOCALES[l] = ALL_LOCALES[l];
 }
+const workweekWeekdays = allowedWeekdays.slice(0, 5);
+const byDayTokenRegex = new RegExp(`^([+-]?\\d+)?(${allowedWeekdays.join('|')})$`);
+const weekdayIndexByToken = Object.fromEntries(
+  allowedWeekdays.map((weekday, idx) => [weekday, idx]),
+) as Record<Weekday, number>;
 
 function defaultOrdinal(n: number): string {
   const abs = Math.abs(n);
@@ -612,19 +627,11 @@ function list(arr: (string | number)[], mapFn: (x: string | number) => string = 
 
 function formatByDayToken(tok: string | number, locale: LocaleData): string {
   if (typeof tok === 'number') return tok.toString();
-  const m = tok.match(/^([+-]?\d+)?(MO|TU|WE|TH|FR|SA|SU)$/);
+  const m = tok.toUpperCase().match(byDayTokenRegex);
   if (!m) return tok;
   const ord = m[1] ? parseInt(m[1], 10) : 0;
-  const weekdayMap: {[key: string]: number} = {
-    MO: 0,
-    TU: 1,
-    WE: 2,
-    TH: 3,
-    FR: 4,
-    SA: 5,
-    SU: 6,
-  };
-  const idx = weekdayMap[m[2] as keyof typeof weekdayMap];
+  const weekday = m[2] as Weekday;
+  const idx = weekdayIndexByToken[weekday];
   const name = locale.weekdayNames[idx!];
   if (ord === 0) return name!;
   if (ord === -1) return `${locale.words.last} ${name}`;
@@ -645,6 +652,10 @@ function formatTime(hour: number, minute = 0, second = 0): string {
   return `${hr12} ${ampm}`;
 }
 
+function weekdayTokenFromZdt(zdt: Temporal.ZonedDateTime): string {
+  return allowedWeekdays[zdt.dayOfWeek - 1]!;
+}
+
 function tzAbbreviation(zdt: Temporal.ZonedDateTime): string {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: zdt.timeZoneId,
@@ -655,11 +666,25 @@ function tzAbbreviation(zdt: Temporal.ZonedDateTime): string {
   return tzPart?.value || zdt.timeZoneId;
 }
 
-export function toText(input: RRuleTemporal | string, locale?: string): string {
+function formatLocalizedDate(zdt: Temporal.ZonedDateTime, locale: string): string {
+  try {
+    return zdt.toLocaleString(locale, {dateStyle: 'long'});
+  } catch {
+    return zdt.toLocaleString('en', {dateStyle: 'long'});
+  }
+}
+
+export interface ToTextOptions {
+  includeDtstart?: boolean;
+}
+
+export function toText(input: RRuleTemporal | string, locale?: string, options: ToTextOptions = {}): string {
   const rule = typeof input === 'string' ? new RRuleTemporal({rruleString: input}) : input;
   const opts = rule.options();
-  const lang = (locale ?? Intl.DateTimeFormat().resolvedOptions().locale).split('-')[0];
+  const resolvedLocale = locale ?? Intl.DateTimeFormat().resolvedOptions().locale;
+  const lang = resolvedLocale.split('-')[0];
   const data = LOCALES[lang!] || en;
+  const dateLocale = LOCALES[lang!] ? resolvedLocale : 'en';
   const {
     freq,
     interval = 1,
@@ -679,6 +704,16 @@ export function toText(input: RRuleTemporal | string, locale?: string): string {
     exDate,
   } = opts;
 
+  const dayOrLarger = freq === 'YEARLY' || freq === 'MONTHLY' || freq === 'WEEKLY' || freq === 'DAILY';
+  const hasExplicitTime = Boolean(byHour || byMinute || bySecond);
+  const dtstartHasTime = opts.dtstart.hour !== 0 || opts.dtstart.minute !== 0 || opts.dtstart.second !== 0;
+  const shouldDefaultTime = dayOrLarger && (hasExplicitTime || dtstartHasTime);
+
+  const textByDay = byDay ?? (freq === 'WEEKLY' ? [weekdayTokenFromZdt(opts.dtstart)] : undefined);
+  const textByHour = byHour ?? (shouldDefaultTime ? [opts.dtstart.hour] : undefined);
+  const textByMinute = textByHour ? byMinute ?? [opts.dtstart.minute] : byMinute;
+  const textBySecond = textByHour ? bySecond ?? [opts.dtstart.second] : bySecond;
+
   const parts: string[] = [data.words.every];
 
   const baseKey = {
@@ -692,15 +727,15 @@ export function toText(input: RRuleTemporal | string, locale?: string): string {
   }[freq] as keyof LocaleData['units'];
   const base = data.units[baseKey];
 
-  const daysNormalized = byDay?.map((d) => d.toUpperCase());
+  const daysNormalized = textByDay?.map((d) => d.toUpperCase());
   const isWeekdays =
     daysNormalized &&
-    daysNormalized.length === 5 &&
-    ['MO', 'TU', 'WE', 'TH', 'FR'].every((d) => daysNormalized.includes(d));
+    daysNormalized.length === workweekWeekdays.length &&
+    workweekWeekdays.every((d) => daysNormalized.includes(d));
   const isEveryday =
     daysNormalized &&
-    daysNormalized.length === 7 &&
-    ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'].every((d) => daysNormalized.includes(d));
+    daysNormalized.length === allowedWeekdays.length &&
+    allowedWeekdays.every((d) => daysNormalized.includes(d));
 
   if (freq === 'WEEKLY' && interval === 1 && isWeekdays) {
     parts.push(data.words.weekday);
@@ -714,15 +749,15 @@ export function toText(input: RRuleTemporal | string, locale?: string): string {
     }
   }
 
-  if (freq === 'WEEKLY' && byDay && !isWeekdays && !isEveryday) {
+  if (freq === 'WEEKLY' && textByDay && !isWeekdays && !isEveryday) {
     parts.push(
       data.words.on,
-      list(byDay, (t) => formatByDayToken(t, data), data.words.and),
+      list(textByDay, (t) => formatByDayToken(t, data), data.words.and),
     );
-  } else if (byDay && freq !== 'WEEKLY') {
+  } else if (textByDay && freq !== 'WEEKLY') {
     parts.push(
       data.words.on,
-      list(byDay, (t) => formatByDayToken(t, data), data.words.and),
+      list(textByDay, (t) => formatByDayToken(t, data), data.words.and),
     );
   }
 
@@ -756,25 +791,28 @@ export function toText(input: RRuleTemporal | string, locale?: string): string {
     );
   }
 
-  if (byHour) {
-    const minutes = byMinute ?? [0];
-    const seconds = bySecond ?? [0];
-    const times = byHour.flatMap((h) => minutes.flatMap((m) => seconds.map((s) => formatTime(h, m, s))));
+  if (textByHour) {
+    const minutes = textByMinute ?? [0];
+    const seconds = textBySecond ?? [0];
+    const times = textByHour.flatMap((h) => minutes.flatMap((m) => seconds.map((s) => formatTime(h, m, s))));
     parts.push(data.words.at, list(times, undefined, data.words.and));
     parts.push(tzAbbreviation(opts.dtstart));
   }
 
-  if (!byHour && byMinute) {
-    parts.push(data.words.at_minute, list(byMinute, undefined, data.words.and));
+  if (!textByHour && textByMinute) {
+    parts.push(data.words.at_minute, list(textByMinute, undefined, data.words.and));
   }
 
-  if (!byHour && !byMinute && bySecond) {
-    parts.push(data.words.at_second, list(bySecond, undefined, data.words.and));
+  if (!textByHour && !textByMinute && textBySecond) {
+    parts.push(data.words.at_second, list(textBySecond, undefined, data.words.and));
+  }
+
+  if (options.includeDtstart) {
+    parts.push(data.words.starting_from, formatLocalizedDate(opts.dtstart, dateLocale));
   }
 
   if (until) {
-    const monthName = data.monthNames[until.month - 1]!;
-    parts.push(data.words.until, `${monthName} ${until.day}, ${until.year}`);
+    parts.push(data.words.until, formatLocalizedDate(until, dateLocale));
   } else if (count !== undefined) {
     parts.push(data.words.for, count.toString(), count === 1 ? data.words.time : data.words.times);
   }
